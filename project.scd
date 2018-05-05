@@ -2,10 +2,8 @@
 
 (
 //initialize global variables
-~numHuman = 0;
-~numNature = 0;
-~numMechanic = 0;
-~numMusic = 0;
+~numElements = Array.fill(4,0);
+// 0: numHuman; 1: numNature; 2: numMechanic; 3: numMusic;
 
 // dictionary that maps the type of sound to the folder index
 d = Dictionary.newFrom(List[\human, Dictionary.newFrom(List[\children_playing,2]),
@@ -98,7 +96,7 @@ d = Dictionary.newFrom(List[\human, Dictionary.newFrom(List[\children_playing,2]
 						\amp, ~elementVolume[0]  * ~globalPanVol[1]]));
 			}
 			);
-			~numHuman = ~numHuman + 1;
+			~numElements[0] = ~numElements[0] + 1;
 
 
 			}.play;
@@ -133,8 +131,8 @@ d = Dictionary.newFrom(List[\human, Dictionary.newFrom(List[\children_playing,2]
 			);
 
 		});
-		~numNature = ~numNature + 1;
-		["~numNature", ~numNature].postln;
+		~numElements[1] = ~numElements[1] + 1;
+		["~numElements[1]", ~numElements[1]].postln;
 	}.play;
 
 	}
@@ -167,8 +165,8 @@ d = Dictionary.newFrom(List[\human, Dictionary.newFrom(List[\children_playing,2]
 
 			});
 
-			~numMechanic = ~numMechanic + 1;
-			["~numMechanic", ~numMechanic].postln;
+			~numElements[2] = ~numElements[2] + 1;
+			["~numElements[2]", ~numElements[2]].postln;
 		}.play;
 	}
 	{\music} {
@@ -200,7 +198,7 @@ d = Dictionary.newFrom(List[\human, Dictionary.newFrom(List[\children_playing,2]
 
 			});
 
-			~numMusic = ~numMusic + 1;
+			~numElements[3] = ~numElements[3] + 1;
 		}.play;
 	};
 };
@@ -222,9 +220,9 @@ d = Dictionary.newFrom(List[\human, Dictionary.newFrom(List[\children_playing,2]
 				// free & remove buffer
 				~currHumanBuff[0].free;
 				~currHumanBuff.removeAt(0);
-				~numHuman = ~numHuman - 1;
+				~numElements[0] = ~numElements[0] - 1;
 
-				["~numHuman", ~numHuman].postln;
+				["~numElements[0]", ~numElements[0]].postln;
 			},{}
 		);
 	}
@@ -239,7 +237,7 @@ d = Dictionary.newFrom(List[\human, Dictionary.newFrom(List[\children_playing,2]
 				// free & remove buffer
 				~currNatureBuff[0].free;
 				~currNatureBuff.removeAt(0);
-				~numNature = ~numNature - 1;
+				~numElements[1] = ~numElements[1] - 1;
 
 			}, {}
 		);
@@ -255,8 +253,8 @@ d = Dictionary.newFrom(List[\human, Dictionary.newFrom(List[\children_playing,2]
 				// free & remove buffer
 				~currMechanicBuff[0].free;
 				~currMechanicBuff.removeAt(0);
-				~numMechanic = ~numMechanic - 1;
-				["~numMechanic", ~numMechanic].postln;
+				~numElements[2] = ~numElements[2] - 1;
+				["~numElements[2]", ~numElements[2]].postln;
 			}, {}
 		);
 	}
@@ -270,7 +268,7 @@ d = Dictionary.newFrom(List[\human, Dictionary.newFrom(List[\children_playing,2]
 				// free & remove buffer
 				~currMusicBuff[0].free;
 				~currMusicBuff.removeAt(0);
-				~numMusic = ~numMusic - 1;
+				~numElements[3] = ~numElements[3] - 1;
 	})};
 
 };
@@ -425,8 +423,8 @@ s.waitForBoot({
 					diff = msg[1].round(1) - ~elementNoise[0];
 					~elementNoise[0] = msg[1].round(1);
 					["~elementNoise[0]", msg[1].round(1),
-						"diff", diff, "~numHuman", ~numHuman].postln;
-					if(~numHuman > 0,
+						"diff", diff, "~numElements[0]", ~numElements[0]].postln;
+					if(~numElements[0] > 0,
 						{
 							if(diff > 0, {
 								for ( 1, diff,
@@ -458,7 +456,7 @@ s.waitForBoot({
 				{
 					diff = msg[1].round(1) - ~elementNoise[1];
 					~elementNoise[1] = msg[1].round(1);
-					if(~numNature > 0,
+					if(~numElements[1] > 0,
 						{
 							if(diff > 0, {
 								for ( 1, diff,
@@ -489,7 +487,7 @@ s.waitForBoot({
 				{
 					diff = msg[1].round(1) - ~elementNoise[2];
 					~elementNoise[2] = msg[1].round(1);
-					if(~numMechanic > 0,
+					if(~numElements[2] > 0,
 						{
 							if(diff > 0, {
 								for ( 1, diff,
@@ -519,7 +517,7 @@ s.waitForBoot({
 				{
 					diff = msg[1].round(1) - ~elementNoise[3];
 					~elementNoise[3] = msg[1].round(1);
-					if(~numMusic > 0,
+					if(~numElements[3] > 0,
 						{
 							if(diff > 0, {
 								for ( 1, diff,
