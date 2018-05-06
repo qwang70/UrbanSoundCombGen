@@ -108,7 +108,7 @@ d = Dictionary.newFrom(List[\human, Dictionary.newFrom(List[\children_playing,2]
 		Routine{
 			newFile = ~getRandomSoundFile.value(~folderPath[d[\nature].choose]).fullPath;
 			~soundFileHist[1] = ~soundFileHist[1].add(newFile);
-			~filePlayTypeHist.add(\nature);
+			~filePlayTypeHist = ~filePlayTypeHist.add(\nature);
 			// add to buffer
 			buffer = Buffer.read(s, newFile);
 			~currSoundBuff[1] = ~currSoundBuff[1].add(buffer);
@@ -121,7 +121,7 @@ d = Dictionary.newFrom(List[\human, Dictionary.newFrom(List[\children_playing,2]
 		Routine{
 			newFile = ~getRandomSoundFile.value(~folderPath[d[\mechanic].choose]).fullPath;
 			~soundFileHist[2] = ~soundFileHist[2].add(newFile);
-			~filePlayTypeHist.add(\mechanic);
+			~filePlayTypeHist = ~filePlayTypeHist.add(\mechanic);
 			// add to buffer
 			buffer = Buffer.read(s, newFile);
 			~currSoundBuff[2] = ~currSoundBuff[2].add(buffer);
@@ -133,7 +133,7 @@ d = Dictionary.newFrom(List[\human, Dictionary.newFrom(List[\children_playing,2]
 		Routine{
 			newFile = ~getRandomSoundFile.value(~folderPath[d[\music].choose]).fullPath;
 			~soundFileHist[3] = ~soundFileHist[3].add(newFile);
-			~filePlayTypeHist.add(\music);
+			~filePlayTypeHist = ~filePlayTypeHist.add(\music);
 			// add to buffer
 			buffer = Buffer.read(s, newFile);
 			~currSoundBuff[3] = ~currSoundBuff[3].add(buffer);
@@ -171,16 +171,12 @@ d = Dictionary.newFrom(List[\human, Dictionary.newFrom(List[\children_playing,2]
 		if( ~currSoundSynth[1].size > 0,
 			{
 				// free & remove synth
-				["before ~currSoundSynth[1]", ~currSoundSynth[1]].postln;
 				~currSoundSynth[1][0].free;
 				~currSoundSynth[1].removeAt(0);
-				["after ~currSoundSynth[1]", ~currSoundSynth[1]].postln;
 
 				// free & remove buffer
-				["before ~currSoundBuff[1]", ~currSoundBuff[1]].postln;
 				~currSoundBuff[1][0].free;
 				~currSoundBuff[1].removeAt(0);
-				["after ~currSoundBuff[1]", ~currSoundBuff[1]].postln;
 				~numSound[1] = ~numSound[1] - 1;
 
 			}, {}
@@ -309,7 +305,7 @@ s.waitForBoot({
 		\toggle1,
 		{
 			arg msg, time, addr, port;
-			msg.postln;
+			[msg, time, addr, port].postln;
 			case
 			{msg[1] == 0}
 			{
@@ -549,31 +545,45 @@ s.waitForBoot({
 		\next,
 		{
 			arg msg, time, addr, port;
-			var totalNumSound, type;
+			var totalNumSound, type, tempNum;
 			'next'.postln;
+			if(msg[1] == 0, {
 
-			// pop old sound
-			totalNumSound = ~numSound.sum;
-			if(totalNumSound > 0, {
-				type = block {|break|
-				    for(~filePlayTypeHist.size() - totalNumSound,
-					~filePlayTypeHist.size()-1,
-					{
-						arg i, currType;
-						i.postln;
-						currType = ~filePlayTypeHist[~filePlayTypeHist.size() - totalNumSound];
-						if(~numSound[~typeToIdx[currType]] > 0,
-							{break.value(currType)} )
-					}
-				)
-			};
-			type.postln;
-			// type = ~filePlayTypeHist[~filePlayTypeHist.size() - totalNumSound];
-			["numSound", ~numSound, totalNumSound].postln;
-			["old hist", ~filePlayTypeHist,~filePlayTypeHist.size() - totalNumSound,  type].postln;
-			~removeSound.value(type);
-			~addNewSound.value(type);});
-
+				// pop old sound
+				totalNumSound = ~numSound.sum;
+				tempNum = 0;
+				["~filePlayTypeHist", ~filePlayTypeHist, ~filePlayTypeHist.size()].postln;
+				if(totalNumSound > 0, {
+					type = block {|break|
+						forBy(~filePlayTypeHist.size()-1, 0, -1,
+							{
+								arg i;
+								var currType;
+								i.postln;
+								currType = ~filePlayTypeHist[i];
+								["currType", currType].postln;
+								if(~numSound[~typeToIdx[currType]] > 0,
+									{
+										tempNum = tempNum + 1;
+										["update temp", tempNum].postln;
+								} );
+								[tempNum, totalNumSound].postln;
+								if(totalNumSound == tempNum,
+									{break.value(currType)});
+							}
+						);
+						break.value(nil);
+					};
+					type.postln;
+					if(type.notNil, {
+						["numSound", ~numSound, totalNumSound].postln;
+						["old hist", ~filePlayTypeHist,~filePlayTypeHist.size() - totalNumSound,  type].postln;
+						["type to add", type].postln;
+						~removeSound.value(type);
+						~addNewSound.value(type);
+					});
+				});
+			});
 		},
 		'/combGen/multipush1/2/1'
 	).add;
@@ -589,3 +599,5 @@ s.waitForBoot({
 )
 s.plotTree;
 s.freeAll
+
+forBy (~filePlayTypeHist.size(), 0, -1, { arg i; i.postln });
