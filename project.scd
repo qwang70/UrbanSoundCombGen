@@ -1,17 +1,17 @@
 //Prior to writing code, make sure your TouchOSC app is set to send OSC messages to your computer's IP address, on port 57120.
 
 (
-//initialize global variables
-~numSound = Array.fill(4,0);
-// 0: numHuman; 1: numNature; 2: numMechanic; 3: numMusic;
+// The outport and IP address for the computer
+~adrs = NetAddr("10.194.20.26", 58100);
 
 // dictionary that maps the type of sound to the folder index
-d = Dictionary.newFrom(List[\human, Dictionary.newFrom(List[\children_playing,2]),
-	\nature, Dictionary.newFrom(List[\dog_bark,3]),
-	\mechanic,Dictionary.newFrom(List[\air_conditioner,0, \car_horn, 1, \drilling, 4,
+d = Dictionary.newFrom(List[
+	0, Dictionary.newFrom(List[\children_playing,2]),
+	1, Dictionary.newFrom(List[\dog_bark,3]),
+	2,Dictionary.newFrom(List[\air_conditioner,0, \car_horn, 1, \drilling, 4,
 		\engine_idling, 5, \gun_shot, 6, \jackhammer, 7, \siren, 8
 	]),
-	\music, Dictionary.newFrom(List[\street_music, 9])]);
+	3, Dictionary.newFrom(List[\street_music, 9])]);
 ~typeToIdx = Dictionary.newFrom(List[\human, 0, \nature, 1, \mechanic, 2, \music, 3]);
 
 // function get a random sound file
@@ -30,28 +30,35 @@ d = Dictionary.newFrom(List[\human, Dictionary.newFrom(List[\children_playing,2]
 ~dataPath = PathName.new("/Users/wangqiwen/Downloads/UrbanSound/data");
 ~folderPath = ~dataPath.folders;
 
-// initiate file history
+~initArrays = {
+	//initialize global variables
+	~numSound = Array.fill(4,0);
+	// 0: numHuman; 1: numNature; 2: numMechanic; 3: numMusic;
 
-~soundFileHist = Array.with(Array.new(),Array.new(),Array.new(),Array.new());
-// 1:humanFileHist; 2: natureFileHist; 3: mechanicFileHist; 4: musicFileHist
 
-// add files to the history type
-~filePlayTypeHist = Array.new();
+	// initiate file history
+	~soundFileHist = Array.with(Array.new(),Array.new(),Array.new(),Array.new());
+	// 1:humanFileHist; 2: natureFileHist; 3: mechanicFileHist; 4: musicFileHist
 
-// initiate file buffer list
-~currSoundBuff = Array.with(Array.new(),Array.new(),Array.new(),Array.new());
-// 1:currHumanBuff; 2:currNatureBuff; 3:currMechanicBuff; 4: currMusicBuff;
+	// add files to the history type
+	~filePlayTypeHist = Array.new();
 
-// initiate file synth list
-~currSoundSynth = Array.with(Array.new(),Array.new(),Array.new(),Array.new());
-// 1: currHumanSynth; 2: currNatureSynth; 3: currMechanicSynth; 4: currMusicSynth
+	// initiate file buffer list
+	~currSoundBuff = Array.with(Array.new(),Array.new(),Array.new(),Array.new());
+	// 1:currHumanBuff; 2:currNatureBuff; 3:currMechanicBuff; 4: currMusicBuff;
 
-// noiseness
-~elementNoise = Array.fill(4, 1);
-~elementPan = Array.fill(4, 0);
-~elementVolume = Array.fill(4, 1);
+	// initiate file synth list
+	~currSoundSynth = Array.with(Array.new(),Array.new(),Array.new(),Array.new());
+	// 1: currHumanSynth; 2: currNatureSynth; 3: currMechanicSynth; 4: currMusicSynth
 
-~globalPanVol = Array.with(0, 0.5);
+	// initialize variables for noiseness, pan, and volume
+	~elementNoise = Array.fill(4, 1);
+	~elementPan = Array.fill(4, 0);
+	~elementVolume = Array.fill(4, 1);
+	~globalPanVol = Array.with(0, 0.5);
+};
+
+~initArrays.value();
 
 //current buffer that is playing
 //boot the SC audio server
@@ -87,19 +94,19 @@ d = Dictionary.newFrom(List[\human, Dictionary.newFrom(List[\children_playing,2]
 
 	// add to history
 	switch (type)
-	{\human}   {
+	{0}   {
 		// routine
 		Routine{
 			newFile =
-			~getRandomSoundFile.value(~folderPath[d[\human].choose]).fullPath;
-			~soundFileHist[0] = ~soundFileHist[0].add(newFile);
-			~filePlayTypeHist = ~filePlayTypeHist.add(\human);
+			~getRandomSoundFile.value(~folderPath[d[type].choose]).fullPath;
+			~soundFileHist[type] = ~soundFileHist[type].add(newFile);
+			~filePlayTypeHist = ~filePlayTypeHist.add(type);
 			// add to buffer
 			buffer = Buffer.read(s, newFile);
-			~currSoundBuff[0] = ~currSoundBuff[0].add(buffer);
-			~currSoundBuff[0].postln;
+			~currSoundBuff[type] = ~currSoundBuff[type].add(buffer);
+			~currSoundBuff[type].postln;
 			s.sync; //wait for completion
-			addBufSynthHelper.value(buffer, 0);
+			addBufSynthHelper.value(buffer, type);
 		}.play;
 
 
@@ -532,10 +539,24 @@ s.waitForBoot({
 		'/combGen/multifader1/2'
 	).add;
 	OSCdef.new(
-		\prev,
+		\reset,
 		{
 			arg msg, time, addr, port;
 			msg.postln;
+			// reset Array values
+			~initArrays.value();
+			// reset element each row
+			4.do({|i|
+				~adrs.sendMsg("/combGen/toggle" ++ (i+1), 0);
+				~adrs.sendMsg("/combGen/fader" ++ (i+1), 1);
+				~adrs.sendMsg("/combGen/rotaryPan" ++ (i+1), 0.5);
+				~adrs.sendMsg("/combGen/rotaryVolume" ++ (i+1), 0.5);
+			});
+			// reset multifader
+			2.do({|i|
+				~adrs.sendMsg("/combGen/multifader1/" ++ (i+1), 0.5);
+			});
+
 		},
 		'/combGen/multipush1/1/1'
 	).add;
@@ -597,5 +618,3 @@ s.waitForBoot({
 )
 s.plotTree;
 s.freeAll
-
-forBy (~filePlayTypeHist.size(), 0, -1, { arg i; i.postln });
