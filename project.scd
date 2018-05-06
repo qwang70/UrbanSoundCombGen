@@ -275,7 +275,6 @@ s.waitForBoot({
 			BufRateScale.kr(buf) * rate, 1, 0, loop,
 			doneAction: 0
 		);
-		amp.postln;
 		sig = sig * amp;
 		sig = sig.collect{|chan|
 			Pan2.ar(chan, pan)
@@ -291,7 +290,6 @@ s.waitForBoot({
 			BufRateScale.kr(buf) * rate, 1, 0, loop,
 			doneAction: 0
 		);
-		amp.postln;
 		sig = sig * amp;
 		sig = Pan2.ar(sig, pan, 1);
 		Out.ar(out, sig);
