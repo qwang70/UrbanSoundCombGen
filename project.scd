@@ -2,7 +2,7 @@
 
 (
 //initialize global variables
-~numElements = Array.fill(4,0);
+~numSound = Array.fill(4,0);
 // 0: numHuman; 1: numNature; 2: numMechanic; 3: numMusic;
 
 // dictionary that maps the type of sound to the folder index
@@ -12,6 +12,7 @@ d = Dictionary.newFrom(List[\human, Dictionary.newFrom(List[\children_playing,2]
 		\engine_idling, 5, \gun_shot, 6, \jackhammer, 7, \siren, 8
 	]),
 	\music, Dictionary.newFrom(List[\street_music, 9])]);
+~typeToIdx = Dictionary.newFrom(List[\human, 0, \nature, 1, \mechanic, 2, \music, 3]);
 
 // function get a random sound file
 ~getRandomSoundFile = {
@@ -20,7 +21,6 @@ d = Dictionary.newFrom(List[\human, Dictionary.newFrom(List[\children_playing,2]
 	allFiles = folderPath.files;
 	randFile = allFiles.choose;
 	// choose a none csv/json file
-	// TODO: Install quarks? Quarks.install('MP3');
 	while ( { randFile.fileName.contains(".csv") ||  randFile.fileName.contains(".json")
 		|| randFile.fileName.contains(".mp3")},
 	{ randFile = allFiles.choose; });
@@ -31,174 +31,114 @@ d = Dictionary.newFrom(List[\human, Dictionary.newFrom(List[\children_playing,2]
 ~folderPath = ~dataPath.folders;
 
 // initiate file history
-//TODO: or just a linked list
-~humanFileHist = Array.new();
-~natureFileHist = Array.new();
-~mechanicFileHist = Array.new();
-~musicFileHist = Array.new();
+
+~soundFileHist = Array.with(Array.new(),Array.new(),Array.new(),Array.new());
+// 1:humanFileHist; 2: natureFileHist; 3: mechanicFileHist; 4: musicFileHist
 
 // add files to the history type
 ~filePlayTypeHist = Array.new();
 
 // initiate file buffer list
-~currHumanBuff = Array.new();
-~currNatureBuff = Array.new();
-~currMechanicBuff = Array.new();
-~currMusicBuff = Array.new();
+~currSoundBuff = Array.with(Array.new(),Array.new(),Array.new(),Array.new());
+// 1:currHumanBuff; 2:currNatureBuff; 3:currMechanicBuff; 4: currMusicBuff;
+
 // initiate file synth list
-~currHumanSynth = Array.new();
-~currNatureSynth = Array.new();
-~currMechanicSynth = Array.new();
-~currMusicSynth = Array.new();
+~currSoundSynth = Array.with(Array.new(),Array.new(),Array.new(),Array.new());
+// 1: currHumanSynth; 2: currNatureSynth; 3: currMechanicSynth; 4: currMusicSynth
 
 // noiseness
 ~elementNoise = Array.fill(4, 1);
 ~elementPan = Array.fill(4, 0);
 ~elementVolume = Array.fill(4, 1);
 
-~globalPanVol = Array.fill(2, 0.5);
+~globalPanVol = Array.with(0, 0.5);
 
 //current buffer that is playing
 //boot the SC audio server
 // select random file and add to hist
 ~addNewSound = {
 	arg type;
-	var newFile, buffer;
+	var newFile, buffer, addBufSynthHelper;
+
+	addBufSynthHelper = {
+		arg buffer, idx;
+		if(buffer.numChannels == 2, {
+			// stereo channel
+			~currSoundSynth[idx] = ~currSoundSynth[idx].add(
+				Synth.new(\stereo_play, [\buf, buffer,
+					\pan, ~elementPan[idx] + ~globalPanVol[0],
+					\amp, ~elementVolume[idx] * ~globalPanVol[1]]));
+
+
+		},
+		{
+			// mono channel
+			~currSoundSynth[idx] = ~currSoundSynth[idx].add(
+				Synth.new(\mono_play, [\buf, buffer,
+					\pan, ~elementPan[idx] + ~globalPanVol[0],
+					\amp, ~elementVolume[idx]  * ~globalPanVol[1]]));
+		}
+		);
+		~numSound[idx] = ~numSound[idx] + 1;
+		~numSound.postln;
+	};
+
 	["add new sound", type].postln;
+
 	// add to history
 	switch (type)
 	{\human}   {
 		// routine
 		Routine{
-			newFile = ~getRandomSoundFile.value(~folderPath[d[\human].choose]).fullPath;
-			~humanFileHist = ~humanFileHist.add(newFile);
+			newFile =
+			~getRandomSoundFile.value(~folderPath[d[\human].choose]).fullPath;
+			~soundFileHist[0] = ~soundFileHist[0].add(newFile);
+			~filePlayTypeHist = ~filePlayTypeHist.add(\human);
 			// add to buffer
 			buffer = Buffer.read(s, newFile);
-			~currHumanBuff = ~currHumanBuff.add(buffer);
+			~currSoundBuff[0] = ~currSoundBuff[0].add(buffer);
+			~currSoundBuff[0].postln;
 			s.sync; //wait for completion
-			["numchannel", buffer.numChannels].postln;
-			if(buffer.numChannels == 2, {
-				// stereo channel
-				"stereo channel".postln;
-				~currHumanSynth = ~currHumanSynth.add(
-					Synth.new(\stereo_play, [\buf, buffer,
-						\pan, ~elementPan[0] + ~globalPanVol[0],
-						\amp, ~elementVolume[0] * ~globalPanVol[1]]));
-
-
-			},
-			{
-				// mono channel
-				"mono channel".postln;
-				~currHumanSynth = ~currHumanSynth.add(
-					Synth.new(\mono_play, [\buf, buffer,
-						\pan, ~elementPan[0] + ~globalPanVol[0],
-						\amp, ~elementVolume[0]  * ~globalPanVol[1]]));
-			}
-			);
-			~numElements[0] = ~numElements[0] + 1;
-
-
-			}.play;
+			addBufSynthHelper.value(buffer, 0);
+		}.play;
 
 
 	}
 	{\nature} {
-	Routine{
-		newFile = ~getRandomSoundFile.value(~folderPath[d[\nature].choose]).fullPath;
-		~natureFileHist = ~natureFileHist.add(newFile);
-		// add to buffer
-		buffer = Buffer.read(s, newFile);
-		~currNatureBuff = ~currNatureBuff.add(buffer);
-		s.sync; //wait for completion
-		if(buffer.numChannels == 2, {
-			// stereo channel
-			"stereo channel".postln;
-			~currNatureSynth = ~currNatureSynth.add(
-				Synth.new(\stereo_play, [\buf, buffer,
-					\pan, ~elementPan[1] + ~globalPanVol[0],
-					\amp, ~elementVolume[1] * ~globalPanVol[1] ])
-			);
-
-		},
-		{
-			// mono channel
-			"mono channel".postln;
-			~currNatureSynth = ~currNatureSynth.add(
-				Synth.new(\mono_play, [\buf, buffer,
-					\pan, ~elementPan[1] + ~globalPanVol[0],
-					\amp, ~elementVolume[1]  * ~globalPanVol[1]])
-			);
-
-		});
-		~numElements[1] = ~numElements[1] + 1;
-		["~numElements[1]", ~numElements[1]].postln;
-	}.play;
+		Routine{
+			newFile = ~getRandomSoundFile.value(~folderPath[d[\nature].choose]).fullPath;
+			~soundFileHist[1] = ~soundFileHist[1].add(newFile);
+			~filePlayTypeHist.add(\nature);
+			// add to buffer
+			buffer = Buffer.read(s, newFile);
+			~currSoundBuff[1] = ~currSoundBuff[1].add(buffer);
+			s.sync; //wait for completion
+			addBufSynthHelper.value(buffer, 1);
+		}.play;
 
 	}
 	{\mechanic} {
 		Routine{
 			newFile = ~getRandomSoundFile.value(~folderPath[d[\mechanic].choose]).fullPath;
-			~mechanicFileHist = ~mechanicFileHist.add(newFile);
+			~soundFileHist[2] = ~soundFileHist[2].add(newFile);
+			~filePlayTypeHist.add(\mechanic);
 			// add to buffer
 			buffer = Buffer.read(s, newFile);
-			~currMechanicBuff = ~currMechanicBuff.add(buffer);
+			~currSoundBuff[2] = ~currSoundBuff[2].add(buffer);
 			s.sync; //wait for completion
-			if(buffer.numChannels == 2, {
-				// stereo channel
-				"stereo channel".postln;
-				~currMechanicSynth = ~currMechanicSynth.add(
-					Synth.new(\stereo_play, [\buf, buffer,
-						\pan, ~elementPan[2] + ~globalPanVol[0],
-						\amp, ~elementVolume[2] * ~globalPanVol[1] ])
-				);
-
-			},
-			{
-				// mono channel
-				"mono channel".postln;
-				~currMechanicSynth = ~currMechanicSynth.add(
-					Synth.new(\mono_play, [\buf, buffer,
-						\pan, ~elementPan[2] + ~globalPanVol[0],
-						\amp, ~elementVolume[2]  * ~globalPanVol[1]])
-				);
-
-			});
-
-			~numElements[2] = ~numElements[2] + 1;
-			["~numElements[2]", ~numElements[2]].postln;
+			addBufSynthHelper.value(buffer, 2);
 		}.play;
 	}
 	{\music} {
 		Routine{
 			newFile = ~getRandomSoundFile.value(~folderPath[d[\music].choose]).fullPath;
-			~musicFileHist = ~musicFileHist.add(newFile);
+			~soundFileHist[3] = ~soundFileHist[3].add(newFile);
+			~filePlayTypeHist.add(\music);
 			// add to buffer
 			buffer = Buffer.read(s, newFile);
-			~currMusicBuff = ~currMusicBuff.add(buffer);
+			~currSoundBuff[3] = ~currSoundBuff[3].add(buffer);
 			s.sync; //wait for completion
-			if(buffer.numChannels == 2, {
-				// stereo channel
-				"stereo channel".postln;
-				~currMusicSynth = ~currMusicSynth.add(
-					Synth.new(\stereo_play, [\buf, buffer,
-						\pan, ~elementPan[3] + ~globalPanVol[0],
-						\amp, ~elementVolume[3] * ~globalPanVol[1] ])
-				);
-
-			},
-			{
-				// mono channel
-				"mono channel".postln;
-				~currMusicSynth = ~currMusicSynth.add(
-					Synth.new(\mono_play, [\buf, buffer,
-						\pan, ~elementPan[3] + ~globalPanVol[0],
-						\amp, ~elementVolume[3]  * ~globalPanVol[1]])
-				);
-
-			});
-
-			~numElements[3] = ~numElements[3] + 1;
+			addBufSynthHelper.value(buffer, 3);
 		}.play;
 	};
 };
@@ -211,70 +151,124 @@ d = Dictionary.newFrom(List[\human, Dictionary.newFrom(List[\children_playing,2]
 	// add to history
 	switch (type)
 	{\human}   {
-		if( ~currHumanSynth.size > 0,
+		if( ~currSoundSynth[0].size > 0,
 			{
 				// free & remove synth
-				~currHumanSynth[0].free;
-				~currHumanSynth.removeAt(0);
+				~currSoundSynth[0][0].free;
+				~currSoundSynth[0].removeAt(0);
 
 				// free & remove buffer
-				~currHumanBuff[0].free;
-				~currHumanBuff.removeAt(0);
-				~numElements[0] = ~numElements[0] - 1;
+				~currSoundBuff[0][0].free;
+				~currSoundBuff[0].removeAt(0);
+				~numSound[0] = ~numSound[0] - 1;
 
-				["~numElements[0]", ~numElements[0]].postln;
+				["~numSound[0]", ~numSound[0]].postln;
 			},{}
 		);
 	}
 	{\nature} {
-		~currNatureSynth.size.postln;
-		if( ~currNatureSynth.size > 0,
+		~currSoundSynth[1].size.postln;
+		if( ~currSoundSynth[1].size > 0,
 			{
 				// free & remove synth
-				~currNatureSynth[0].free;
-				~currNatureSynth.removeAt(0);
+				["before ~currSoundSynth[1]", ~currSoundSynth[1]].postln;
+				~currSoundSynth[1][0].free;
+				~currSoundSynth[1].removeAt(0);
+				["after ~currSoundSynth[1]", ~currSoundSynth[1]].postln;
 
 				// free & remove buffer
-				~currNatureBuff[0].free;
-				~currNatureBuff.removeAt(0);
-				~numElements[1] = ~numElements[1] - 1;
+				["before ~currSoundBuff[1]", ~currSoundBuff[1]].postln;
+				~currSoundBuff[1][0].free;
+				~currSoundBuff[1].removeAt(0);
+				["after ~currSoundBuff[1]", ~currSoundBuff[1]].postln;
+				~numSound[1] = ~numSound[1] - 1;
 
 			}, {}
 		);
 
 	}
 	{\mechanic} {
-		if( ~currMechanicSynth.size > 0,
+		if( ~currSoundSynth[2].size > 0,
 			{
 				// free & remove synth
-				~currMechanicSynth[0].free;
-				~currMechanicSynth.removeAt(0);
+				~currSoundSynth[2][0].free;
+				~currSoundSynth[2].removeAt(0);
 
 				// free & remove buffer
-				~currMechanicBuff[0].free;
-				~currMechanicBuff.removeAt(0);
-				~numElements[2] = ~numElements[2] - 1;
-				["~numElements[2]", ~numElements[2]].postln;
+				~currSoundBuff[2][0].free;
+				~currSoundBuff[2].removeAt(0);
+				~numSound[2] = ~numSound[2] - 1;
+				["~numSound[2]", ~numSound[2]].postln;
 			}, {}
 		);
 	}
 	{\music} {
-		if( ~currMusicSynth.size > 0,
+		if( ~currSoundSynth[3].size > 0,
 			{
 				// free & remove synth
-				~currMusicSynth[0].free;
-				~currMusicSynth.removeAt(0);
+				~currSoundSynth[3][0].free;
+				~currSoundSynth[3].removeAt(0);
 
 				// free & remove buffer
-				~currMusicBuff[0].free;
-				~currMusicBuff.removeAt(0);
-				~numElements[3] = ~numElements[3] - 1;
+				~currSoundBuff[3][0].free;
+				~currSoundBuff[3].removeAt(0);
+				~numSound[3] = ~numSound[3] - 1;
 	})};
 
 };
 
 s.waitForBoot({
-	var noisenessHelper;
+	var noisenessHelper, panHelper, volumeHelper;
+
+	// helper function to adjust the noiseness
+	noisenessHelper = {
+		arg idx, msg, type;
+		var diff;
+		if(~elementNoise[idx] != msg[1].round(1),
+			{
+				diff = msg[1].round(1) - ~elementNoise[idx];
+
+				// assign new value to the noiseness
+				~elementNoise[idx] = msg[1].round(1);
+				if(~numSound[idx] > 0,
+					{
+						if(diff > 0, {
+							// add new sound if noiseness is larger
+							for ( 1, diff,
+								{
+									~addNewSound.value(type);
+							} )
+						},
+						{
+							// remove old sound if noiseness is smaller
+							for ( 1, diff * (-1),
+								{
+									~removeSound.value(type);
+							} )
+						})
+					}
+				);
+		});
+	};
+
+	// helper function to adjust the pan
+	panHelper = {
+		arg idx, msg;
+		~elementPan[idx] = msg[1]*2-1;
+		~currSoundSynth[idx].do({
+			arg item, i;
+			item.set(
+				\pan, ~elementPan[idx] + ~globalPanVol[0]);
+		});
+	};
+
+	// helper function to adjust the volume
+	volumeHelper = {
+		arg idx, msg;
+		~elementVolume[idx] = msg[1]*2;
+		~currSoundSynth[idx].do({ arg item; item.set(
+			\amp, ~elementVolume[idx] * ~globalPanVol[1]) });
+	};
 
 	//create and add SynthDefs
 	//create & add buffer-playing SynthDef
@@ -294,7 +288,7 @@ s.waitForBoot({
 	}
 	).add;
 
-		SynthDef.new(\mono_play, {
+	SynthDef.new(\mono_play, {
 		arg buf, rate = 1, loop = 1, out = 0, pan = 0, amp = 1;
 		var sig;
 		sig = PlayBuf.ar(1, buf,
@@ -417,33 +411,7 @@ s.waitForBoot({
 		\fader1,
 		{
 			arg msg, time, addr, port;
-			var diff;
-			if(~elementNoise[0] != msg[1].round(1),
-				{
-					diff = msg[1].round(1) - ~elementNoise[0];
-					~elementNoise[0] = msg[1].round(1);
-					["~elementNoise[0]", msg[1].round(1),
-						"diff", diff, "~numElements[0]", ~numElements[0]].postln;
-					if(~numElements[0] > 0,
-						{
-							if(diff > 0, {
-								for ( 1, diff,
-									{
-										"plus 1".postln;
-										~addNewSound.value(\human);
-								} )
-							},
-							{
-								for ( 1, diff * (-1),
-									{
-										"minus 1".postln;
-										~removeSound.value(\human);
-								} )
-							})
-						}
-					)
-
-			});
+			noisenessHelper.value(0, msg, \human);
 		},
 		'/combGen/fader1'
 	).add;
@@ -451,29 +419,7 @@ s.waitForBoot({
 		\fader2,
 		{
 			arg msg, time, addr, port;
-			var diff;
-			if(~elementNoise[1] != msg[1].round(1),
-				{
-					diff = msg[1].round(1) - ~elementNoise[1];
-					~elementNoise[1] = msg[1].round(1);
-					if(~numElements[1] > 0,
-						{
-							if(diff > 0, {
-								for ( 1, diff,
-									{
-										~addNewSound.value(\nature);
-								} )
-							},
-							{
-								for ( 1, diff * (-1),
-									{
-										~removeSound.value(\nature);
-								} )
-							})
-						}
-					)
-
-			});
+			noisenessHelper.value(1, msg, \nature);
 		},
 		'/combGen/fader2'
 	).add;
@@ -482,29 +428,7 @@ s.waitForBoot({
 		\fader3,
 		{
 			arg msg, time, addr, port;
-			var diff;
-			if(~elementNoise[2] != msg[1].round(1),
-				{
-					diff = msg[1].round(1) - ~elementNoise[2];
-					~elementNoise[2] = msg[1].round(1);
-					if(~numElements[2] > 0,
-						{
-							if(diff > 0, {
-								for ( 1, diff,
-									{
-										~addNewSound.value(\mechanic);
-								} )
-							},
-							{
-								for ( 1, diff * (-1),
-									{
-										~removeSound.value(\mechanic);
-								} )
-							})
-						}
-					)
-
-			});
+			noisenessHelper.value(2, msg, \mechanic);
 		},
 		'/combGen/fader3'
 	).add;
@@ -512,29 +436,7 @@ s.waitForBoot({
 		\fader4,
 		{
 			arg msg, time, addr, port;
-			var diff;
-			if(~elementNoise[3] != msg[1].round(1),
-				{
-					diff = msg[1].round(1) - ~elementNoise[3];
-					~elementNoise[3] = msg[1].round(1);
-					if(~numElements[3] > 0,
-						{
-							if(diff > 0, {
-								for ( 1, diff,
-									{
-										~addNewSound.value(\music);
-								} )
-							},
-							{
-								for ( 1, diff * (-1),
-									{
-										~removeSound.value(\music);
-								} )
-							})
-						}
-					)
-
-			});
+			noisenessHelper.value(3, msg, \music);
 		},
 		'/combGen/fader4'
 	).add;
@@ -544,15 +446,7 @@ s.waitForBoot({
 		{
 			arg msg, time, addr, port;
 			// scale from [0,1] to [-1,1]
-			~elementPan[0] = msg[1]*2-1;
-			msg.postln;
-			~currHumanSynth.size.postln;
-			~currHumanSynth.do({
-				arg item, i;
-				["change pan", i, ~elementPan[0] + ~globalPanVol[0]];
-				item.set(
-				\pan, ~elementPan[0] + ~globalPanVol[0])
-			});
+			panHelper.value(0, msg);
 		},
 		'/combGen/rotaryPan1'
 	).add;
@@ -561,9 +455,8 @@ s.waitForBoot({
 		{
 			arg msg, time, addr, port;
 			// scale from [0,1] to [-1,1]
-			~elementPan[1] = msg[1]*2-1;
-			~currNatureSynth.do({ arg item; item.set(
-				\pan, ~elementPan[1] + ~globalPanVol[0]) });
+			msg.postln;
+			panHelper.value(1, msg);
 
 		},
 		'/combGen/rotaryPan2'
@@ -573,9 +466,7 @@ s.waitForBoot({
 		{
 			arg msg, time, addr, port;
 			// scale from [0,1] to [-1,1]
-			~elementPan[2] = msg[1]*2-1;
-			~currMechanicSynth.do({ arg item; item.set(
-				\pan, ~elementPan[2] + ~globalPanVol[0]) });
+			panHelper.value(2, msg);
 
 		},
 		'/combGen/rotaryPan3'
@@ -585,10 +476,7 @@ s.waitForBoot({
 		{
 			arg msg, time, addr, port;
 			// scale from [0,1] to [-1,1]
-			~elementPan[3] = msg[1]*2-1;
-			~currMusicSynth.do({ arg item; item.set(
-				\pan, ~elementPan[3] + ~globalPanVol[0]) });
-
+			panHelper.value(3, msg);
 		},
 		'/combGen/rotaryPan4'
 	).add;
@@ -597,10 +485,7 @@ s.waitForBoot({
 		\rotaryVolume1,
 		{
 			arg msg, time, addr, port;
-			// scale from [0,1] to [0,2]
-			~elementVolume[0] = msg[1]*2;
-			~currHumanSynth.do({ arg item; item.set(
-				\amp, ~elementVolume[0] * ~globalPanVol[1]) });
+			volumeHelper.value(0, msg);
 		},
 		'/combGen/rotaryVolume1'
 	).add;
@@ -608,10 +493,7 @@ s.waitForBoot({
 		\rotaryVolume2,
 		{
 			arg msg, time, addr, port;
-			// scale from [0,1] to [0,2]
-			~elementVolume[1] = msg[1]*2;
-			~currNatureSynth.do({ arg item; item.set(
-				\amp, ~elementVolume[1] * ~globalPanVol[1]) });
+			volumeHelper.value(1, msg);
 		},
 		'/combGen/rotaryVolume2'
 	).add;
@@ -619,10 +501,7 @@ s.waitForBoot({
 		\rotaryVolume3,
 		{
 			arg msg, time, addr, port;
-			// scale from [0,1] to [0,2]
-			~elementVolume[2] = msg[1]*2;
-			~currMechanicSynth.do({ arg item; item.set(
-				\amp, ~elementVolume[2] * ~globalPanVol[1]) });
+			volumeHelper.value(2, msg);
 		},
 		'/combGen/rotaryVolume3'
 	).add;
@@ -630,10 +509,7 @@ s.waitForBoot({
 		\rotaryVolume4,
 		{
 			arg msg, time, addr, port;
-			// scale from [0,1] to [0,2]
-			~elementVolume[3] = msg[1]*2;
-			~currMusicSynth.do({ arg item; item.set(
-				\amp, ~elementVolume[3] * ~globalPanVol[1]) });
+			volumeHelper.value(3, msg);
 		},
 		'/combGen/rotaryVolume4'
 	).add;
@@ -642,15 +518,10 @@ s.waitForBoot({
 		{
 			arg msg, time, addr, port;
 			~globalPanVol[0] = msg[1]*2 - 1;
-			[~elementPan[0], ~globalPanVol[0], ~elementPan[0] + ~globalPanVol[0]].postln;
-			~currHumanSynth.do({ arg item; item.set(
-				\pan, ~elementPan[0] + ~globalPanVol[0]) });
-			~currNatureSynth.do({ arg item; item.set(
-				\pan, ~elementPan[1] + ~globalPanVol[0]) });
-			~currMechanicSynth.do({ arg item; item.set(
-				\pan, ~elementPan[2] + ~globalPanVol[0]) });
-			~currMusicSynth.do({ arg item; item.set(
-				\pan, ~elementPan[3] + ~globalPanVol[0]) });
+			~currSoundSynth.do({ arg item, i;
+				item.do({ arg item; item.set(
+					\pan, ~elementPan[i] + ~globalPanVol[0]) });
+			});
 		},
 		'/combGen/multifader1/1'
 	).add;
@@ -659,14 +530,10 @@ s.waitForBoot({
 		{
 			arg msg, time, addr, port;
 			~globalPanVol[1] = msg[1];
-			~currHumanSynth.do({ arg item; item.set(
-				\amp, ~elementVolume[0] * ~globalPanVol[1]) });
-			~currNatureSynth.do({ arg item; item.set(
-				\amp, ~elementVolume[1] * ~globalPanVol[1]) });
-			~currMechanicSynth.do({ arg item; item.set(
-				\amp, ~elementVolume[2] * ~globalPanVol[1]) });
-			~currMusicSynth.do({ arg item; item.set(
-				\amp, ~elementVolume[3] * ~globalPanVol[1]) });
+			~currSoundSynth.do({ arg item, i;
+				item.do({ arg item; item.set(
+					\amp, ~elementVolume[i] * ~globalPanVol[1]) });
+			});
 		},
 		'/combGen/multifader1/2'
 	).add;
@@ -682,7 +549,31 @@ s.waitForBoot({
 		\next,
 		{
 			arg msg, time, addr, port;
+			var totalNumSound, type;
 			'next'.postln;
+
+			// pop old sound
+			totalNumSound = ~numSound.sum;
+			if(totalNumSound > 0, {
+				type = block {|break|
+				    for(~filePlayTypeHist.size() - totalNumSound,
+					~filePlayTypeHist.size()-1,
+					{
+						arg i, currType;
+						i.postln;
+						currType = ~filePlayTypeHist[~filePlayTypeHist.size() - totalNumSound];
+						if(~numSound[~typeToIdx[currType]] > 0,
+							{break.value(currType)} )
+					}
+				)
+			};
+			type.postln;
+			// type = ~filePlayTypeHist[~filePlayTypeHist.size() - totalNumSound];
+			["numSound", ~numSound, totalNumSound].postln;
+			["old hist", ~filePlayTypeHist,~filePlayTypeHist.size() - totalNumSound,  type].postln;
+			~removeSound.value(type);
+			~addNewSound.value(type);});
+
 		},
 		'/combGen/multipush1/2/1'
 	).add;
@@ -696,5 +587,5 @@ s.waitForBoot({
 	).add;
 });
 )
-
+s.plotTree;
 s.freeAll
