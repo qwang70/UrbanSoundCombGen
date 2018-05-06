@@ -12,7 +12,6 @@ d = Dictionary.newFrom(List[
 		\engine_idling, 5, \gun_shot, 6, \jackhammer, 7, \siren, 8
 	]),
 	3, Dictionary.newFrom(List[\street_music, 9])]);
-~typeToIdx = Dictionary.newFrom(List[\human, 0, \nature, 1, \mechanic, 2, \music, 3]);
 
 // function get a random sound file
 ~getRandomSoundFile = {
@@ -27,7 +26,7 @@ d = Dictionary.newFrom(List[
 	randFile;
 };
 
-~dataPath = PathName.new("/Users/wangqiwen/Downloads/UrbanSound/data");
+~dataPath = PathName.new(thisProcess.nowExecutingPath.dirname ++ "/data");
 ~folderPath = ~dataPath.folders;
 
 ~initArrays = {
@@ -92,140 +91,79 @@ d = Dictionary.newFrom(List[
 
 	["add new sound", type].postln;
 
-	// add to history
-	switch (type)
-	{0}   {
-		// routine
-		Routine{
-			newFile =
-			~getRandomSoundFile.value(~folderPath[d[type].choose]).fullPath;
-			~soundFileHist[type] = ~soundFileHist[type].add(newFile);
-			~filePlayTypeHist = ~filePlayTypeHist.add(type);
-			// add to buffer
-			buffer = Buffer.read(s, newFile);
-			~currSoundBuff[type] = ~currSoundBuff[type].add(buffer);
-			~currSoundBuff[type].postln;
-			s.sync; //wait for completion
-			addBufSynthHelper.value(buffer, type);
-		}.play;
+	// routine
+	Routine{
+		newFile =
+		~getRandomSoundFile.value(~folderPath[d[type].choose]).fullPath;
+		// add to history
+		~soundFileHist[type] = ~soundFileHist[type].add(newFile);
+		~filePlayTypeHist = ~filePlayTypeHist.add(type);
+		// add to buffer
+		buffer = Buffer.read(s, newFile);
+		~currSoundBuff[type] = ~currSoundBuff[type].add(buffer);
+		~currSoundBuff[type].postln;
+		s.sync; //wait for completion
+		addBufSynthHelper.value(buffer, type);
+	}.play;
 
-
-	}
-	{\nature} {
-		Routine{
-			newFile = ~getRandomSoundFile.value(~folderPath[d[\nature].choose]).fullPath;
-			~soundFileHist[1] = ~soundFileHist[1].add(newFile);
-			~filePlayTypeHist = ~filePlayTypeHist.add(\nature);
-			// add to buffer
-			buffer = Buffer.read(s, newFile);
-			~currSoundBuff[1] = ~currSoundBuff[1].add(buffer);
-			s.sync; //wait for completion
-			addBufSynthHelper.value(buffer, 1);
-		}.play;
-
-	}
-	{\mechanic} {
-		Routine{
-			newFile = ~getRandomSoundFile.value(~folderPath[d[\mechanic].choose]).fullPath;
-			~soundFileHist[2] = ~soundFileHist[2].add(newFile);
-			~filePlayTypeHist = ~filePlayTypeHist.add(\mechanic);
-			// add to buffer
-			buffer = Buffer.read(s, newFile);
-			~currSoundBuff[2] = ~currSoundBuff[2].add(buffer);
-			s.sync; //wait for completion
-			addBufSynthHelper.value(buffer, 2);
-		}.play;
-	}
-	{\music} {
-		Routine{
-			newFile = ~getRandomSoundFile.value(~folderPath[d[\music].choose]).fullPath;
-			~soundFileHist[3] = ~soundFileHist[3].add(newFile);
-			~filePlayTypeHist = ~filePlayTypeHist.add(\music);
-			// add to buffer
-			buffer = Buffer.read(s, newFile);
-			~currSoundBuff[3] = ~currSoundBuff[3].add(buffer);
-			s.sync; //wait for completion
-			addBufSynthHelper.value(buffer, 3);
-		}.play;
-	};
 };
 
 // select random file and add to hist
 ~removeSound = {
 	arg type;
-	var newFile;
 	["remove new sound", type].postln;
 	// add to history
-	switch (type)
-	{\human}   {
-		if( ~currSoundSynth[0].size > 0,
-			{
+	if( ~currSoundSynth[type].size > 0,
+		{
+			// fade out the sound
+			Routine{
+				["before sleep"].postln;
+				~currSoundSynth[type][0].set(\gate, 0);
+				1.sleep;
+				["after sleep"].postln;
 				// free & remove synth
-				~currSoundSynth[0][0].free;
-				~currSoundSynth[0].removeAt(0);
+				~currSoundSynth[type][0].free;
+				~currSoundSynth[type].removeAt(0);
 
 				// free & remove buffer
-				~currSoundBuff[0][0].free;
-				~currSoundBuff[0].removeAt(0);
-				~numSound[0] = ~numSound[0] - 1;
+				~currSoundBuff[type][0].free;
+				~currSoundBuff[type].removeAt(0);
+				~numSound[type] = ~numSound[type] - 1;
+			}.play;
+		},{}
+	);
 
-				["~numSound[0]", ~numSound[0]].postln;
-			},{}
-		);
-	}
-	{\nature} {
-		~currSoundSynth[1].size.postln;
-		if( ~currSoundSynth[1].size > 0,
-			{
-				// free & remove synth
-				~currSoundSynth[1][0].free;
-				~currSoundSynth[1].removeAt(0);
-
-				// free & remove buffer
-				~currSoundBuff[1][0].free;
-				~currSoundBuff[1].removeAt(0);
-				~numSound[1] = ~numSound[1] - 1;
-
-			}, {}
-		);
-
-	}
-	{\mechanic} {
-		if( ~currSoundSynth[2].size > 0,
-			{
-				// free & remove synth
-				~currSoundSynth[2][0].free;
-				~currSoundSynth[2].removeAt(0);
-
-				// free & remove buffer
-				~currSoundBuff[2][0].free;
-				~currSoundBuff[2].removeAt(0);
-				~numSound[2] = ~numSound[2] - 1;
-				["~numSound[2]", ~numSound[2]].postln;
-			}, {}
-		);
-	}
-	{\music} {
-		if( ~currSoundSynth[3].size > 0,
-			{
-				// free & remove synth
-				~currSoundSynth[3][0].free;
-				~currSoundSynth[3].removeAt(0);
-
-				// free & remove buffer
-				~currSoundBuff[3][0].free;
-				~currSoundBuff[3].removeAt(0);
-				~numSound[3] = ~numSound[3] - 1;
-	})};
 
 };
-
+// free all OSC def
+OSCdef.freeAll;
 s.waitForBoot({
-	var noisenessHelper, panHelper, volumeHelper;
+	var noisenessHelper, panHelper, volumeHelper, addByNoise, removeByNoise;
 
+	// helper function to add the sound by the noiseness
+	addByNoise = {
+		arg idx;
+		for ( 1, ~elementNoise[idx],
+			{
+				~addNewSound.value(idx);
+		} )
+	};
+
+	removeByNoise = {
+		arg idx;
+		{
+			for ( 1, ~elementNoise[idx],
+				{
+					arg i;
+					i.postln;
+					~removeSound.value(idx);
+					1.wait;
+			} );
+		}.fork;
+	};
 	// helper function to adjust the noiseness
 	noisenessHelper = {
-		arg idx, msg, type;
+		arg idx, msg;
 		var diff;
 		if(~elementNoise[idx] != msg[1].round(1),
 			{
@@ -239,16 +177,20 @@ s.waitForBoot({
 							// add new sound if noiseness is larger
 							for ( 1, diff,
 								{
-									~addNewSound.value(type);
+									~addNewSound.value(idx);
 							} )
 						},
 						{
+							{
 							// remove old sound if noiseness is smaller
 							for ( 1, diff * (-1),
 								{
-									~removeSound.value(type);
+									~removeSound.value(idx);
+									1.wait;
+
 							} )
-						})
+							}.fork;
+						};)
 					}
 				);
 		});
@@ -276,13 +218,14 @@ s.waitForBoot({
 	//create and add SynthDefs
 	//create & add buffer-playing SynthDef
 	SynthDef.new(\stereo_play, {
-		arg buf, rate = 1, loop = 1, out = 0, pan = 0, amp = 1;
-		var sig;
+		arg buf, rate = 1, loop = 1, out = 0, pan = 0, amp = 1, gate = 1;
+		var sig, env;
 		sig = PlayBuf.ar(2, buf,
 			BufRateScale.kr(buf) * rate, 1, 0, loop,
 			doneAction: 0
 		);
-		sig = sig * amp;
+		env = EnvGen.kr(Env.adsr(2, 0.3, 1, 1), gate, doneAction:0);
+		sig = sig * env * amp;
 		sig = sig.collect{|chan|
 			Pan2.ar(chan, pan)
 		}.sum;
@@ -291,13 +234,14 @@ s.waitForBoot({
 	).add;
 
 	SynthDef.new(\mono_play, {
-		arg buf, rate = 1, loop = 1, out = 0, pan = 0, amp = 1;
-		var sig;
+		arg buf, rate = 1, loop = 1, out = 0, pan = 0, amp = 1, gate = 1;
+		var sig, env;
 		sig = PlayBuf.ar(1, buf,
 			BufRateScale.kr(buf) * rate, 1, 0, loop,
 			doneAction: 0
 		);
-		sig = sig * amp;
+		env = EnvGen.kr(Env.adsr(2, 0.3, 1, 1), gate, doneAction:0);
+		sig = sig * env * amp;
 		sig = Pan2.ar(sig, pan, 1);
 		Out.ar(out, sig);
 	}
@@ -314,23 +258,18 @@ s.waitForBoot({
 			case
 			{msg[1] == 0}
 			{
-				for ( 1, ~elementNoise[0],
-					{
-						~removeSound.value(\human);
-				} )
+
+				removeByNoise.value(0);
 
 			}
 			{msg[1] == 1}
 			{
-				for ( 1, ~elementNoise[0],
-					{
-						~addNewSound.value(\human);
-				} )
+				addByNoise.value(0);
 			}
 
 		},
 		'/combGen/toggle1'
-	).add;
+	);
 
 	OSCdef.new(
 		\toggle2,
@@ -340,22 +279,17 @@ s.waitForBoot({
 			case
 			{msg[1] == 0}
 			{
-				for ( 1, ~elementNoise[1],
-					{
-						~removeSound.value(\nature);
-				} )
+				removeByNoise.value(1);
 
 			}
 			{msg[1] == 1}
 			{
-				for ( 1, ~elementNoise[1],
-					{
-						~addNewSound.value(\nature);
-				} )
+
+				addByNoise.value(1);
 			}
 		},
 		'/combGen/toggle2'
-	).add;
+	);
 
 	OSCdef.new(
 		\toggle3,
@@ -365,22 +299,18 @@ s.waitForBoot({
 			case
 			{msg[1] == 0}
 			{
-				for ( 1, ~elementNoise[2],
-					{
-						~removeSound.value(\mechanic);
-				} )
+
+				removeByNoise.value(2);
 
 			}
 			{msg[1] == 1}
 			{
-				for ( 1, ~elementNoise[2],
-					{
-						~addNewSound.value(\mechanic);
-				} )
+
+				addByNoise.value(2);
 			}
 		},
 		'/combGen/toggle3'
-	).add;
+	);
 
 	OSCdef.new(
 		\toggle4,
@@ -390,57 +320,52 @@ s.waitForBoot({
 			case
 			{msg[1] == 0}
 			{
-				for ( 1, ~elementNoise[3],
-					{
-						~removeSound.value(\music);
-				} )
+				removeByNoise.value(3);
 
 			}
 			{msg[1] == 1}
 			{
-				for ( 1, ~elementNoise[3],
-					{
-						~addNewSound.value(\music);
-				} )
+
+				addByNoise.value(3);
 			}
 
 		},
 		'/combGen/toggle4'
-	).add;
+	);
 	//faders
 	OSCdef.new(
 		\fader1,
 		{
 			arg msg, time, addr, port;
-			noisenessHelper.value(0, msg, \human);
+			noisenessHelper.value(0, msg);
 		},
 		'/combGen/fader1'
-	).add;
+	);
 	OSCdef.new(
 		\fader2,
 		{
 			arg msg, time, addr, port;
-			noisenessHelper.value(1, msg, \nature);
+			noisenessHelper.value(1, msg);
 		},
 		'/combGen/fader2'
-	).add;
+	);
 
 	OSCdef.new(
 		\fader3,
 		{
 			arg msg, time, addr, port;
-			noisenessHelper.value(2, msg, \mechanic);
+			noisenessHelper.value(2, msg);
 		},
 		'/combGen/fader3'
-	).add;
+	);
 	OSCdef.new(
 		\fader4,
 		{
 			arg msg, time, addr, port;
-			noisenessHelper.value(3, msg, \music);
+			noisenessHelper.value(3, msg);
 		},
 		'/combGen/fader4'
-	).add;
+	);
 	//pans
 	OSCdef.new(
 		\rotaryPan1,
@@ -450,7 +375,7 @@ s.waitForBoot({
 			panHelper.value(0, msg);
 		},
 		'/combGen/rotaryPan1'
-	).add;
+	);
 	OSCdef.new(
 		\rotaryPan2,
 		{
@@ -461,7 +386,7 @@ s.waitForBoot({
 
 		},
 		'/combGen/rotaryPan2'
-	).add;
+	);
 	OSCdef.new(
 		\rotaryPan3,
 		{
@@ -471,7 +396,7 @@ s.waitForBoot({
 
 		},
 		'/combGen/rotaryPan3'
-	).add;
+	);
 	OSCdef.new(
 		\rotaryPan4,
 		{
@@ -480,7 +405,7 @@ s.waitForBoot({
 			panHelper.value(3, msg);
 		},
 		'/combGen/rotaryPan4'
-	).add;
+	);
 	//volumes
 	OSCdef.new(
 		\rotaryVolume1,
@@ -489,7 +414,7 @@ s.waitForBoot({
 			volumeHelper.value(0, msg);
 		},
 		'/combGen/rotaryVolume1'
-	).add;
+	);
 	OSCdef.new(
 		\rotaryVolume2,
 		{
@@ -497,7 +422,7 @@ s.waitForBoot({
 			volumeHelper.value(1, msg);
 		},
 		'/combGen/rotaryVolume2'
-	).add;
+	);
 	OSCdef.new(
 		\rotaryVolume3,
 		{
@@ -505,7 +430,7 @@ s.waitForBoot({
 			volumeHelper.value(2, msg);
 		},
 		'/combGen/rotaryVolume3'
-	).add;
+	);
 	OSCdef.new(
 		\rotaryVolume4,
 		{
@@ -513,7 +438,7 @@ s.waitForBoot({
 			volumeHelper.value(3, msg);
 		},
 		'/combGen/rotaryVolume4'
-	).add;
+	);
 	OSCdef.new(
 		\globalpan,
 		{
@@ -525,7 +450,7 @@ s.waitForBoot({
 			});
 		},
 		'/combGen/multifader1/1'
-	).add;
+	);
 	OSCdef.new(
 		\globalvolume,
 		{
@@ -537,12 +462,17 @@ s.waitForBoot({
 			});
 		},
 		'/combGen/multifader1/2'
-	).add;
+	);
 	OSCdef.new(
 		\reset,
 		{
 			arg msg, time, addr, port;
 			msg.postln;
+
+			// clean all buff and synth
+			4.do({|i|
+				removeByNoise.value(i);
+			});
 			// reset Array values
 			~initArrays.value();
 			// reset element each row
@@ -559,7 +489,7 @@ s.waitForBoot({
 
 		},
 		'/combGen/multipush1/1/1'
-	).add;
+	);
 	OSCdef.new(
 		\next,
 		{
@@ -571,33 +501,30 @@ s.waitForBoot({
 				// pop old sound
 				totalNumSound = ~numSound.sum;
 				tempNum = 0;
-				["~filePlayTypeHist", ~filePlayTypeHist, ~filePlayTypeHist.size()].postln;
+
 				if(totalNumSound > 0, {
+					// get the type of the last song playing
 					type = block {|break|
 						forBy(~filePlayTypeHist.size()-1, 0, -1,
 							{
 								arg i;
 								var currType;
-								i.postln;
+								// find the last sound playing
 								currType = ~filePlayTypeHist[i];
-								["currType", currType].postln;
-								if(~numSound[~typeToIdx[currType]] > 0,
+								if(~numSound[currType] > 0,
 									{
 										tempNum = tempNum + 1;
-										["update temp", tempNum].postln;
 								} );
-								[tempNum, totalNumSound].postln;
+								// check whether hit the last sound playing
 								if(totalNumSound == tempNum,
 									{break.value(currType)});
 							}
 						);
 						break.value(nil);
 					};
-					type.postln;
+
 					if(type.notNil, {
-						["numSound", ~numSound, totalNumSound].postln;
-						["old hist", ~filePlayTypeHist,~filePlayTypeHist.size() - totalNumSound,  type].postln;
-						["type to add", type].postln;
+						["type not nil", type].postln;
 						~removeSound.value(type);
 						~addNewSound.value(type);
 					});
@@ -605,7 +532,7 @@ s.waitForBoot({
 			});
 		},
 		'/combGen/multipush1/2/1'
-	).add;
+	);
 	OSCdef.new(
 		\save,
 		{
@@ -613,7 +540,7 @@ s.waitForBoot({
 			'save'.postln;
 		},
 		'/combGen/multipush1/3/1'
-	).add;
+	);
 });
 )
 s.plotTree;
