@@ -102,10 +102,8 @@ d = Dictionary.newFrom(List[
 		}
 		);
 		~numSound[idx] = ~numSound[idx] + 1;
-		~numSound.postln;
+		["~numSound", ~numSound].postln;
 	};
-
-	["add new sound", type].postln;
 
 	// routine
 	Routine{
@@ -117,7 +115,6 @@ d = Dictionary.newFrom(List[
 		// add to buffer
 		buffer = Buffer.read(s, newFile);
 		~currSoundBuff[type] = ~currSoundBuff[type].add(buffer);
-		~currSoundBuff[type].postln;
 		s.sync; //wait for completion
 		addBufSynthHelper.value(buffer, type);
 	}.play;
@@ -127,7 +124,6 @@ d = Dictionary.newFrom(List[
 // select random file and add to hist
 ~removeSound = {
 	arg type;
-	["remove new sound", type].postln;
 	// add to history
 	if( ~currSoundSynth[type].size > 0,
 		{
@@ -268,7 +264,6 @@ s.waitForBoot({
 		\toggle1,
 		{
 			arg msg, time, addr, port;
-			[msg, time, addr, port].postln;
 			case
 			{msg[1] == 0}
 			{
@@ -289,7 +284,6 @@ s.waitForBoot({
 		\toggle2,
 		{
 			arg msg, time, addr, port;
-			["toggle2", msg].postln;
 			case
 			{msg[1] == 0}
 			{
@@ -309,7 +303,6 @@ s.waitForBoot({
 		\toggle3,
 		{
 			arg msg, time, addr, port;
-			["toggle3", msg].postln;
 			case
 			{msg[1] == 0}
 			{
@@ -330,7 +323,6 @@ s.waitForBoot({
 		\toggle4,
 		{
 			arg msg, time, addr, port;
-			["toggle4", msg].postln;
 			case
 			{msg[1] == 0}
 			{
@@ -395,7 +387,6 @@ s.waitForBoot({
 		{
 			arg msg, time, addr, port;
 			// scale from [0,1] to [-1,1]
-			msg.postln;
 			panHelper.value(1, msg);
 
 		},
@@ -481,9 +472,10 @@ s.waitForBoot({
 		\reset,
 		{
 			arg msg, time, addr, port;
-			msg.postln;
+			"reset".postln;
 
 			// clean all buff and synth
+			~elementNoise.postln;
 			4.do({|i|
 				removeByNoise.value(i);
 			});
@@ -538,7 +530,6 @@ s.waitForBoot({
 					};
 
 					if(type.notNil, {
-						["type not nil", type].postln;
 						~removeSound.value(type);
 						~addNewSound.value(type);
 					});
@@ -551,30 +542,58 @@ s.waitForBoot({
 		\save,
 		{
 			arg msg, time, addr, port;
-			var score, sndbuf, synth;
-			'save'.postln;
-			sndbuf = Buffer.new;
-			score = Score.new;
-			~currSoundBuff[0][0].path.postln;
-			score.add([0, sndbuf.allocReadMsg(~currSoundBuff[0][0].path)]);
-			synth = Synth.basicNew(\stereo_play);
-			score.add([0.2,
-				synth.newMsg(s, [\buffer, sndbuf, \pan, ~elementPan[0] + ~globalPanVol[0],
-					\amp, ~elementVolume[0] * ~globalPanVol[1]])]);
-			score.add([11, 0]);
+			fork{
+				// var score, sndbuf, synth, options;
+				var f, string;
+				'save'.postln;
+				string = "";
+				// concatenate strings
+				~currSoundBuff.do({
+					arg item, idx1;
+					item.do({
+						arg buffer;
+						string = string ++ (buffer.path ++ "," ++ (~elementPan[idx1] + ~globalPanVol[0])
+							++ "," ++  (~elementVolume[idx1] * ~globalPanVol[1])
+							++ "," ++  "\n");
+					}
+					)
+				};
+				f = File(~dirname ++ "/saved.text","w");
+				f.write(string);
+				f.close;
+				)
+				/*score = Score.new;
 
-			score.sort;
-			o = ServerOptions.new.numOutputBusChannels_(2); // stereo output
-			// Score.play(scoreList, s); // synthesize
-			[score, "/tmp/trashme",  ~dirname ++ "/saved.aiff"].postln;
-			o.postln;
-			Score.recordNRT(score, "/tmp/trashme",  "/Users/wangqiwen/Dropbox/course/mus499" ++ "/saved.aiff", options: o); // synthesize
+				// create a Buffer object for adding to the Score
+				sndbuf = Buffer.new;
 
-			577.postln;
+				// take human sound to test
+				// for NRT rendering, the buffer messages must be added to the Score
+				score.add([0, sndbuf.allocReadMsg(~currSoundBuff[0][0].path)]);
+				sndbuf.postln;
+				synth = Synth.basicNew(\stereo_play);
+
+				// .newMsg(target, args, addAction: 'addToHead')
+				score.add([0.2,
+					synth.newMsg(z, [\buffer, sndbuf,
+						\pan, ~elementPan[0] + ~globalPanVol[0],
+						\amp, ~elementVolume[0] * ~globalPanVol[1]
+				])]);
+				// the dummy command. The soundfile will be 20 seconds long
+				score.add([20, 0]);
+
+				// the ServerOptions for rendering the soundfile
+				options = ServerOptions.new.numOutputBusChannels_(2);
+				// score.play(s);
+				// write the soundfile out to disk
+				score.recordNRT( ~dirname ++ "/saved.osc", ~dirname ++ "/saved.aiff", options: options);
+				sndbuf.free;*/
+			};
 		},
 		'/combGen/multipush1/3/1'
 	);
 });
 )
+s.boot;
 s.plotTree;
 s.freeAll
