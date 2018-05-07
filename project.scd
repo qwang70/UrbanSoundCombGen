@@ -1,8 +1,22 @@
 //Prior to writing code, make sure your TouchOSC app is set to send OSC messages to your computer's IP address, on port 57120.
 
+
 (
 // The outport and IP address for the computer
-~adrs = NetAddr("10.194.20.26", 58100);
+
+w = Window.new("Urban Sound Combgen", Rect(400,400,400,400));
+~initComp = CompositeView.new(w,Rect.newSides(30,30,400-30,400-30));
+StaticText.new(~initComp,Rect.newSides(0,0,400-60, 30)).string_("Enter the IP address of your phone/iPad.").resize_(2);
+~t1 = TextField.new(~initComp,Rect.newSides(0,40,400-60,70)).resize_(2);
+~t1.value = "192.168.1.101";
+b = Button.new(~initComp,Rect.newSides(145,80,195,110)).states_([["Enter"]]);
+~t2 = StaticText(~initComp,Rect.newSides(120,120,220,150)).string_("");
+b.action = {
+	~myIP = ~t1.value;
+	~adrs = NetAddr(~myIP, 58100);
+	~t2.string = ~adrs.ip;
+};
+w.front;
 
 // dictionary that maps the type of sound to the folder index
 d = Dictionary.newFrom(List[
@@ -25,8 +39,8 @@ d = Dictionary.newFrom(List[
 	{ randFile = allFiles.choose; });
 	randFile;
 };
-
-~dataPath = PathName.new(thisProcess.nowExecutingPath.dirname ++ "/data");
+~dirname = thisProcess.nowExecutingPath.dirname;
+~dataPath = PathName.new(~dirname ++ "/data");
 ~folderPath = ~dataPath.folders;
 
 ~initArrays = {
@@ -70,6 +84,7 @@ d = Dictionary.newFrom(List[
 		arg buffer, idx;
 		if(buffer.numChannels == 2, {
 			// stereo channel
+			"stereo channel".postln;
 			~currSoundSynth[idx] = ~currSoundSynth[idx].add(
 				Synth.new(\stereo_play, [\buf, buffer,
 					\pan, ~elementPan[idx] + ~globalPanVol[0],
@@ -79,6 +94,7 @@ d = Dictionary.newFrom(List[
 		},
 		{
 			// mono channel
+			"mono channel".postln;
 			~currSoundSynth[idx] = ~currSoundSynth[idx].add(
 				Synth.new(\mono_play, [\buf, buffer,
 					\pan, ~elementPan[idx] + ~globalPanVol[0],
@@ -133,7 +149,6 @@ d = Dictionary.newFrom(List[
 		},{}
 	);
 
-
 };
 // free all OSC def
 OSCdef.freeAll;
@@ -182,13 +197,12 @@ s.waitForBoot({
 						},
 						{
 							{
-							// remove old sound if noiseness is smaller
-							for ( 1, diff * (-1),
-								{
-									~removeSound.value(idx);
-									1.wait;
-
-							} )
+								// remove old sound if noiseness is smaller
+								for ( 1, diff * (-1),
+									{
+										~removeSound.value(idx);
+										1.wait;
+								} )
 							}.fork;
 						};)
 					}
@@ -231,7 +245,7 @@ s.waitForBoot({
 		}.sum;
 		Out.ar(out, sig);
 	}
-	).add;
+	).writeDefFile;
 
 	SynthDef.new(\mono_play, {
 		arg buf, rate = 1, loop = 1, out = 0, pan = 0, amp = 1, gate = 1;
@@ -245,7 +259,7 @@ s.waitForBoot({
 		sig = Pan2.ar(sig, pan, 1);
 		Out.ar(out, sig);
 	}
-	).add;
+	).writeDefFile;
 
 	s.sync; //wait for completion
 
@@ -537,7 +551,26 @@ s.waitForBoot({
 		\save,
 		{
 			arg msg, time, addr, port;
+			var score, sndbuf, synth;
 			'save'.postln;
+			sndbuf = Buffer.new;
+			score = Score.new;
+			~currSoundBuff[0][0].path.postln;
+			score.add([0, sndbuf.allocReadMsg(~currSoundBuff[0][0].path)]);
+			synth = Synth.basicNew(\stereo_play);
+			score.add([0.2,
+				synth.newMsg(s, [\buffer, sndbuf, \pan, ~elementPan[0] + ~globalPanVol[0],
+					\amp, ~elementVolume[0] * ~globalPanVol[1]])]);
+			score.add([11, 0]);
+
+			score.sort;
+			o = ServerOptions.new.numOutputBusChannels_(2); // stereo output
+			// Score.play(scoreList, s); // synthesize
+			[score, "/tmp/trashme",  ~dirname ++ "/saved.aiff"].postln;
+			o.postln;
+			Score.recordNRT(score, "/tmp/trashme",  "/Users/wangqiwen/Dropbox/course/mus499" ++ "/saved.aiff", options: o); // synthesize
+
+			577.postln;
 		},
 		'/combGen/multipush1/3/1'
 	);
