@@ -3,7 +3,8 @@
 
 (
 // The outport and IP address for the computer
-
+~semaphore = Semaphore.new(1);
+~semaphoreForRemove = Semaphore.new(1);
 w = Window.new("Urban Sound Combgen", Rect(400,400,400,400));
 ~initComp = CompositeView.new(w,Rect.newSides(30,30,400-30,400-30));
 StaticText.new(~initComp,Rect.newSides(0,0,400-60, 30)).string_("Enter the IP address of your phone/iPad.").resize_(2);
@@ -34,7 +35,7 @@ d = Dictionary.newFrom(List[
 	allFiles = folderPath.files;
 	randFile = allFiles.choose;
 	// choose a none csv/json file
-	while ( { randFile.fileName.contains(".csv") ||  randFile.fileName.contains(".json")
+	while ( { randFile.isNil || randFile.fileName.contains(".csv") ||  randFile.fileName.contains(".json")
 		|| randFile.fileName.contains(".mp3")},
 	{ randFile = allFiles.choose; });
 	randFile;
@@ -103,6 +104,7 @@ d = Dictionary.newFrom(List[
 		);
 		~numSound[idx] = ~numSound[idx] + 1;
 		["~numSound", ~numSound].postln;
+		["~elementNoise",~elementNoise].postln;
 	};
 
 	// routine
@@ -137,10 +139,14 @@ d = Dictionary.newFrom(List[
 				~currSoundSynth[type][0].free;
 				~currSoundSynth[type].removeAt(0);
 
+				["cleaned synth"].postln;
 				// free & remove buffer
 				~currSoundBuff[type][0].free;
 				~currSoundBuff[type].removeAt(0);
 				~numSound[type] = ~numSound[type] - 1;
+				["after signal", ~semaphoreForRemove.count].postln;
+				~semaphoreForRemove.signal;
+				["after signal", ~semaphoreForRemove.count].postln;
 			}.play;
 		},{}
 	);
@@ -162,14 +168,31 @@ s.waitForBoot({
 
 	removeByNoise = {
 		arg idx;
+		var count = 0;
 		{
-			for ( 1, ~elementNoise[idx],
-				{
-					arg i;
-					i.postln;
-					~removeSound.value(idx);
-					1.wait;
-			} );
+			if(~numSound[idx] > 0, {
+				for ( 1, ~elementNoise[idx],
+					{
+						arg i;
+						~adrs.sendMsg("/combGen/led" ++ (idx+1), 1-((i-1)/~elementNoise[idx]));
+						~removeSound.value(idx);
+						["before ~semaphoreForRemove wait", idx, i,
+							~semaphoreForRemove.count].postln;
+						1.wait;
+						~semaphoreForRemove.wait;
+						["after ~semaphoreForRemove wait", idx, i,
+							~semaphoreForRemove.count].postln;
+					};
+				);
+			}
+			);
+
+			// hardcoded...
+			~adrs.sendMsg("/combGen/led" ++ (idx+1), 0);
+			("before semaphore release" ++ idx).postln;
+			~semaphore.signal;
+			("after semaphore release" ++ idx).postln;
+			s.sync;
 		}.fork;
 	};
 	// helper function to adjust the noiseness
@@ -198,7 +221,10 @@ s.waitForBoot({
 									{
 										~removeSound.value(idx);
 										1.wait;
-								} )
+								};
+
+								);
+
 							}.fork;
 						};)
 					}
@@ -472,25 +498,35 @@ s.waitForBoot({
 		\reset,
 		{
 			arg msg, time, addr, port;
+			if(msg[1] == 0, {
 			"reset".postln;
-
-			// clean all buff and synth
-			~elementNoise.postln;
-			4.do({|i|
-				removeByNoise.value(i);
-			});
-			// reset Array values
-			~initArrays.value();
-			// reset element each row
-			4.do({|i|
-				~adrs.sendMsg("/combGen/toggle" ++ (i+1), 0);
-				~adrs.sendMsg("/combGen/fader" ++ (i+1), 1);
-				~adrs.sendMsg("/combGen/rotaryPan" ++ (i+1), 0.5);
-				~adrs.sendMsg("/combGen/rotaryVolume" ++ (i+1), 0.5);
-			});
-			// reset multifader
-			2.do({|i|
-				~adrs.sendMsg("/combGen/multifader1/" ++ (i+1), 0.5);
+				Routine {
+					// clean all buff and synth
+					"clean all buff and synth".postln;
+					~elementNoise.postln;
+					4.do({|i|
+						removeByNoise.value(i);
+						("before semaphore wait" ++ i).postln;
+						~semaphore.wait;
+						("after semaphore wait" ++ i).postln;
+					});
+					s.sync;
+					// reset Array values
+					"initArrays".postln;
+					~initArrays.value();
+				}.play;
+				// reset element each row
+				["reset element each row"].postln;
+				4.do({|i|
+					~adrs.sendMsg("/combGen/toggle" ++ (i+1), 0);
+					~adrs.sendMsg("/combGen/fader" ++ (i+1), 1);
+					~adrs.sendMsg("/combGen/rotaryPan" ++ (i+1), 0.5);
+					~adrs.sendMsg("/combGen/rotaryVolume" ++ (i+1), 0.5);
+				});
+				// reset multifader
+				2.do({|i|
+					~adrs.sendMsg("/combGen/multifader1/" ++ (i+1), 0.5);
+				});
 			});
 
 		},
