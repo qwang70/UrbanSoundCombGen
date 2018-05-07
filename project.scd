@@ -2,11 +2,29 @@
 
 
 (
-// The outport and IP address for the computer
+
+~dirname = thisProcess.nowExecutingPath.dirname;
+~dataPath = PathName.new(~dirname ++ "/data");
+~folderPath = ~dataPath.folders;
+
 ~semaphore = Semaphore.new(1);
 ~semaphoreForRemove = Semaphore.new(1);
-w = Window.new("Urban Sound Combgen", Rect(400,400,400,400));
+
+i = Image.new(
+        ~dirname +/+ "/background.png"
+    );
+i.scalesWhenResized_(true);
+i.setSize(400, 400);
+// i = Image.new(SCDoc.helpSourceDir +/+ "images/Swamp.png");
+// i.plot;
+w = Window.new("Urban Sound Combgen", Rect(400,400,400,400)).front;
+//initialize components
 ~initComp = CompositeView.new(w,Rect.newSides(30,30,400-30,400-30));
+
+~drawComp = CompositeView.new(w,Rect.newSides(0,0,400,400));
+~drawComp.visible = false;
+
+// initialize window
 StaticText.new(~initComp,Rect.newSides(0,0,400-60, 30)).string_("Enter the IP address of your phone/iPad.").resize_(2);
 ~t1 = TextField.new(~initComp,Rect.newSides(0,40,400-60,70)).resize_(2);
 ~t1.value = "192.168.1.101";
@@ -16,8 +34,17 @@ b.action = {
 	~myIP = ~t1.value;
 	~adrs = NetAddr(~myIP, 58100);
 	~t2.string = ~adrs.ip;
+	~initComp.visible = false;
+	~drawComp.visible = true;
 };
-w.front;
+
+// draw components
+(PathName(thisProcess.nowExecutingPath).pathOnly ++ "windmillFactory.scd").loadPaths; // first load the windmill factory
+~windmill = Array.with(
+	~windmillFactory.(200@50,30,15, [Color.new255(255,253,208),Color.new255(249,166,2)]),
+ ~windmillFactory.(200@150,30,11, [Color.new255(208,240,192), Color.new255(0,78,56)]),
+ ~windmillFactory.(200@250,30,5,[Color.black,Color.blue]),
+ ~windmillFactory.(200@350,30,11,[Color.magenta,Color.black]));
 
 // dictionary that maps the type of sound to the folder index
 d = Dictionary.newFrom(List[
@@ -41,9 +68,6 @@ d = Dictionary.newFrom(List[
 	{ randFile = allFiles.choose; });
 	randFile;
 };
-~dirname = thisProcess.nowExecutingPath.dirname;
-~dataPath = PathName.new(~dirname ++ "/data");
-~folderPath = ~dataPath.folders;
 
 ~initArrays = {
 	//initialize global variables
@@ -74,6 +98,63 @@ d = Dictionary.newFrom(List[
 };
 
 ~initArrays.value();
+~lastTranslate = Array.fill(4,0);
+// draw components
+~userView = UserView(~drawComp, 400@400) // create the UserView
+.background_(Color.white)  // set background color
+.animate_(true)  // start animation !
+.frameRate_(60)  // set frameRate to 60 frames per second
+.drawFunc_({   // callback drawing function
+	var x,y, counter, speed;
+	speed = 0.2;
+    counter = ~userView.frame; // count the number of frames
+	x = 100; // no change in the horizontal axis
+	if(((counter * 0.2) % (~userView.bounds.height+200)) > 400,
+		{y = 400},
+		{y = ((counter * 0.2) % (~userView.bounds.height+200)); });
+	// calculate y as the modulo of the passed frames
+	Pen.push;
+	Pen.fillColor_(Color.yellow);  // set color to yellow
+	Pen.addOval(Rect(x,y-200,200,200));  // create a circle
+	Pen.fillStroke;  // draw circle
+	Pen.pop;
+	i.drawAtPoint(0@0, nil, 'sourceOver', 1);
+	4.do({ |idx|
+		var x, panVal, mapPanX, speed;
+		speed = 1;
+		// x = 0;
+		// calculate pan value
+		panVal = ~elementPan[idx] + ~globalPanVol[0];
+		if(panVal < -1, {panVal = -1}, {if(panVal > 1, {panVal = 1})});
+		// map pan to the canvas
+		// from [-1,1] to [30,370]
+		mapPanX = (panVal*170)+200;
+		// ["panVal", panVal, "mapPanX", mapPanX].postln;
+		if(mapPanX < (200 + ~lastTranslate[idx]), {
+			x = ~lastTranslate[idx] - speed;
+
+		}, {
+			if(mapPanX > (200 + ~lastTranslate[idx]),
+				{
+					// ["~lastTranslate[idx]", ~lastTranslate[idx]].postln;
+					x = ~lastTranslate[idx] + speed;
+				},
+				{x = ~lastTranslate[idx]}
+			)
+
+		});
+		~lastTranslate[idx] = x;
+		Pen.push;
+		// uniform motion
+		Pen.rotate( ~userView.frame / 50 * ~elementNoise[idx], 200 + x, 100*idx+50);  // local rotation
+		Pen.translate(x, 0);  // cummulatively translate each instance 10 pixels upwards and downwards
+		~windmill[idx].draw();
+		Pen.pop;
+	}
+	)
+
+});
+
 
 //current buffer that is playing
 //boot the SC audio server
@@ -581,27 +662,34 @@ s.waitForBoot({
 		\save,
 		{
 			arg msg, time, addr, port;
-			fork{
-				// var score, sndbuf, synth, options;
-				var f, string;
-				'save'.postln;
-				string = "";
-				// concatenate strings
-				~currSoundBuff.do({
-					arg item, idx1;
-					item.do({
-						arg buffer;
-						string = string ++ (buffer.path ++ "," ++ (~elementPan[idx1] + ~globalPanVol[0])
-							++ "," ++  (~elementVolume[idx1] * ~globalPanVol[1])
-							++ "," ++  "\n");
-					}
-					)
-				};
-				f = File(~dirname ++ "/saved.text","w");
-				f.write(string);
-				f.close;
+			// var score, sndbuf, synth, options;
+			var f, string;
+			'save'.postln;
+			string = "";
+			["print string", string].postln;
+			// concatenate strings
+			~currSoundBuff.do({
+				arg item, idx1;
+				idx1.postln;
+				item.do({
+					arg buffer;
+					string = string ++ (buffer.path ++ "," ++ (~elementPan[idx1] + ~globalPanVol[0])
+						++ "," ++  (~elementVolume[idx1] * ~globalPanVol[1])
+						++  "\n"
+					);
+
+					string.postln;
+				}
 				)
-				/*score = Score.new;
+			});
+			["what happened", string].postln;
+			f = File(~dirname ++ "/saved.text","w");
+			f.write(string);
+			f.close;
+
+			/*
+			fork{
+				score = Score.new;
 
 				// create a Buffer object for adding to the Score
 				sndbuf = Buffer.new;
@@ -626,8 +714,8 @@ s.waitForBoot({
 				// score.play(s);
 				// write the soundfile out to disk
 				score.recordNRT( ~dirname ++ "/saved.osc", ~dirname ++ "/saved.aiff", options: options);
-				sndbuf.free;*/
-			};
+				sndbuf.free;
+			};*/
 		},
 		'/combGen/multipush1/3/1'
 	);
