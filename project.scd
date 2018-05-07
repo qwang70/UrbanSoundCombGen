@@ -35,6 +35,7 @@ d = Dictionary.newFrom(List[
 	allFiles = folderPath.files;
 	randFile = allFiles.choose;
 	// choose a none csv/json file
+	["randFile.fileName", randFile.fileName].postln;
 	while ( { randFile.isNil || randFile.fileName.contains(".csv") ||  randFile.fileName.contains(".json")
 		|| randFile.fileName.contains(".mp3")},
 	{ randFile = allFiles.choose; });
@@ -117,6 +118,7 @@ d = Dictionary.newFrom(List[
 		// add to buffer
 		buffer = Buffer.read(s, newFile);
 		~currSoundBuff[type] = ~currSoundBuff[type].add(buffer);
+		~adrs.sendMsg("/combGen/led" ++ (type+1), 1);
 		s.sync; //wait for completion
 		addBufSynthHelper.value(buffer, type);
 	}.play;
@@ -131,10 +133,10 @@ d = Dictionary.newFrom(List[
 		{
 			// fade out the sound
 			Routine{
-				["before sleep"].postln;
+				["before sleep", type].postln;
 				~currSoundSynth[type][0].set(\gate, 0);
 				1.sleep;
-				["after sleep"].postln;
+				["after sleep", type].postln;
 				// free & remove synth
 				~currSoundSynth[type][0].free;
 				~currSoundSynth[type].removeAt(0);
@@ -175,24 +177,25 @@ s.waitForBoot({
 					{
 						arg i;
 						~adrs.sendMsg("/combGen/led" ++ (idx+1), 1-((i-1)/~elementNoise[idx]));
+
 						~removeSound.value(idx);
-						["before ~semaphoreForRemove wait", idx, i,
-							~semaphoreForRemove.count].postln;
 						1.wait;
+						["before ~semaphoreForRemove release" ++ idx, i].postln;
 						~semaphoreForRemove.wait;
-						["after ~semaphoreForRemove wait", idx, i,
-							~semaphoreForRemove.count].postln;
+						["before ~semaphoreForRemove release" ++ idx, i].postln;
+						s.sync;
+
 					};
 				);
 			}
 			);
 
 			// hardcoded...
+			s.sync;
 			~adrs.sendMsg("/combGen/led" ++ (idx+1), 0);
 			("before semaphore release" ++ idx).postln;
 			~semaphore.signal;
 			("after semaphore release" ++ idx).postln;
-			s.sync;
 		}.fork;
 	};
 	// helper function to adjust the noiseness
